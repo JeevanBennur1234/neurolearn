@@ -6,6 +6,7 @@ import os, uuid
 from typing import Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
@@ -45,6 +46,9 @@ class SessionRequest(BaseModel):
 
 @app.get("/", tags=["System"])
 async def root():
+    index_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
     return {"system": "NeuroLearn-GEN v2", "docs": "/docs",
             "flow": "POST /learn/start → /learn/quiz/start → /learn/quiz/submit → /learn/reteach → /learn/test/start → /learn/test/submit"}
 
