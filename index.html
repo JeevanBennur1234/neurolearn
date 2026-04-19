@@ -1190,10 +1190,16 @@ body {
     <div class="content">
 
       <!-- API config banner -->
-      <div class="api-banner" id="api-banner">
+      <div class="api-banner" id="api-banner" style="display:none">
         ⚙️ Backend URL:
         <input type="text" id="api-url-input" value="https://neurolearn-ai-pppi.onrender.com" placeholder="https://your-app.onrender.com" />
-        <span style="opacity:0.7">Make sure <code style="font-family:var(--font-mono)">python run.py</code> is running</span>
+        <span style="opacity:0.7">Connected to Render backend</span>
+      </div>
+
+      <!-- Wake-up banner (shown on first load) -->
+      <div class="api-banner" id="wakeup-banner" style="background:rgba(0,217,184,0.07);border-color:rgba(0,217,184,0.25);color:var(--teal)">
+        <span id="wakeup-spinner" class="spinner" style="width:14px;height:14px;border-top-color:var(--teal)"></span>
+        <span id="wakeup-msg">Connecting to backend — may take 30s on first load (free tier wake-up)...</span>
       </div>
 
       <!-- ══ SCREEN: START ══ -->
@@ -1510,20 +1516,52 @@ let stats = { rounds: 0, score: 0, weak: 0, reteach: 0 };
 // ═══════════════════════════════════════════════
 // API HELPER
 // ═══════════════════════════════════════════════
+const API_BASE = 'https://neurolearn-ai-pppi.onrender.com';
+
 function apiBase() {
-  return (document.getElementById('api-url-input').value || 'http://localhost:8000').replace(/\/$/, '');
+  return API_BASE;
 }
 
-async function api(path, body = null) {
-  const opts = { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json' } };
-  if (body) opts.body = JSON.stringify(body);
-  const res = await fetch(apiBase() + path, opts);
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`API ${res.status}: ${err}`);
+async function api(path, body = null, timeoutMs = 90000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const opts = {
+      method: body ? 'POST' : 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+    };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(API_BASE + path, opts);
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`API ${res.status}: ${err}`);
+    }
+    return res.json();
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('Request timed out. The backend may be waking up — please try again.');
+    throw e;
+  } finally {
+    clearTimeout(timer);
   }
-  return res.json();
 }
+
+// Ping backend on load to wake up Render free tier
+(async function wakeBackend() {
+  const banner = document.getElementById('wakeup-banner');
+  const msg    = document.getElementById('wakeup-msg');
+  try {
+    await fetch(API_BASE + '/health', { signal: AbortSignal.timeout(60000) });
+    msg.textContent = 'Backend connected ✔';
+    document.getElementById('wakeup-spinner').style.display = 'none';
+    setTimeout(() => banner.style.display = 'none', 2000);
+  } catch {
+    msg.textContent = 'Backend unreachable — check https://neurolearn-ai-pppi.onrender.com';
+    banner.style.background = 'rgba(255,107,129,0.08)';
+    banner.style.borderColor = 'rgba(255,107,129,0.3)';
+    banner.style.color = 'var(--rose)';
+  }
+})();
 
 // ═══════════════════════════════════════════════
 // PHASE / STEP MANAGEMENT
@@ -2012,7 +2050,6 @@ function resetAll() {
   document.getElementById('topbar-title').textContent = 'Start learning something new';
   document.getElementById('topbar-score').style.display = 'none';
   document.getElementById('sidebar-topic-chip').style.display = 'none';
-  document.getElementById('api-banner').style.display = '';
   document.getElementById('weak-areas-section').classList.add('hidden');
 
   updateStats({});
