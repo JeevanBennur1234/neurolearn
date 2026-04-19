@@ -1516,7 +1516,12 @@ let stats = { rounds: 0, score: 0, weak: 0, reteach: 0 };
 // ═══════════════════════════════════════════════
 // API HELPER
 // ═══════════════════════════════════════════════
-const API_BASE = 'https://neurolearn-ai-pppi.onrender.com';
+// Environment-based API URL configuration
+// Change `useLocalBackend` to true when testing the Python backend locally on your computer.
+const useLocalBackend = false; 
+const API_BASE = useLocalBackend 
+  ? 'http://127.0.0.1:8000' 
+  : 'https://neurolearn-ai-pppi.onrender.com';
 
 function apiBase() {
   return API_BASE;
@@ -1539,7 +1544,12 @@ async function api(path, body = null, timeoutMs = 90000) {
     }
     return res.json();
   } catch (e) {
-    if (e.name === 'AbortError') throw new Error('Request timed out. The backend may be waking up — please try again.');
+    if (e.name === 'AbortError') {
+      throw new Error('Request timed out. The backend may be waking up — please try again.');
+    }
+    if (e.message.includes('Failed to fetch') || e.name === 'TypeError') {
+      throw new Error('Network Error: Failed to fetch. Ensure the deployed backend is running and CORS allows the request.');
+    }
     throw e;
   } finally {
     clearTimeout(timer);
