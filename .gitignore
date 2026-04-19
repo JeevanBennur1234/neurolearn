@@ -1,0 +1,23 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+
+# Data
+data/
+*.db
+server.log
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
